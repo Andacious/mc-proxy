@@ -58,13 +58,14 @@ func Decode(reader io.Reader) (Config, error) {
 		return Config{}, fmt.Errorf("decode YAML: %w", err)
 	}
 
-	if err := cfg.validate(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil
 }
 
-func (cfg *Config) validate() error {
+// Validate checks the configuration and fills in derived fields and defaults.
+func (cfg *Config) Validate() error {
 	if cfg.DNS.Listen == "" {
 		return errors.New("dns.listen is required")
 	}

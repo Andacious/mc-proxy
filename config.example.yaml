@@ -1,3 +1,6 @@
+# This file matches the built-in default configuration that is written to
+# /etc/mc-proxy/config.yaml on first start. Every featured server is mapped to
+# itself; change each target to your own Bedrock server.
 dns:
   # The container uses an unprivileged port; Docker publishes this as port 53.
   listen: ":5353"
@@ -7,14 +10,32 @@ dns:
   ttl: 60
 
 mappings:
-  - domain: "featured-one.example.net"
+  - domain: "geo.hivebedrock.network"
     proxy_ip: "192.168.1.241"
     listen: ":19132"
-    target: "my-home-server.example.org:20001"
-    idle_timeout: "2m"
+    target: "geo.hivebedrock.network:19132"
+    idle_timeout: "2m0s"
 
-  - domain: "featured-two.example.net"
+  - domain: "mco.cubecraft.net"
     proxy_ip: "192.168.1.242"
     listen: ":19133"
-    target: "my-home-server.example.org:20002"
-    idle_timeout: "2m"
+    target: "mco.cubecraft.net:19132"
+    idle_timeout: "2m0s"
+
+  - domain: "mco.lbsg.net"
+    proxy_ip: "192.168.1.243"
+    listen: ":19134"
+    target: "mco.lbsg.net:19132"
+    idle_timeout: "2m0s"
+
+  - domain: "play.galaxite.net"
+    proxy_ip: "192.168.1.244"
+    listen: ":19135"
+    target: "play.galaxite.net:19132"
+    idle_timeout: "2m0s"
+
+  - domain: "play.inpvp.net"
+    proxy_ip: "192.168.1.245"
+    listen: ":19136"
+    target: "play.inpvp.net:19132"
+    idle_timeout: "2m0s"
