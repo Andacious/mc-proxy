@@ -1,9 +1,13 @@
 package proxy
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"net"
+	"sort"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -87,6 +91,81 @@ func TestUDPProxyMaintainsIndependentClientSessions(t *testing.T) {
 	}
 }
 
+func TestUDPProxyHandles25ConcurrentClients(t *testing.T) {
+	const (
+		clientCount      = 25
+		packetsPerClient = 40
+		maxP95Latency    = time.Second
+		maxTestDuration  = 10 * time.Second
+	)
+
+	upstream := startEchoServer(t)
+	current := startProxy(t, upstream.LocalAddr().String(), 30*time.Second)
+	clients := make([]*net.UDPConn, clientCount)
+	for i := range clients {
+		clients[i] = dialProxy(t, current)
+		t.Cleanup(func() { clients[i].Close() })
+	}
+
+	start := make(chan struct{})
+	results := make(chan packetResult, clientCount*packetsPerClient)
+	var workers sync.WaitGroup
+	workers.Add(clientCount)
+	testStart := time.Now()
+	for clientID, client := range clients {
+		go func() {
+			defer workers.Done()
+			<-start
+			for sequence := 0; sequence < packetsPerClient; sequence++ {
+				payload := []byte(fmt.Sprintf("client=%d sequence=%d", clientID, sequence))
+				started := time.Now()
+				if err := roundTrip(client, payload, 2*time.Second); err != nil {
+					results <- packetResult{err: fmt.Errorf("client %d packet %d: %w", clientID, sequence, err)}
+					return
+				}
+				results <- packetResult{latency: time.Since(started)}
+			}
+		}()
+	}
+	close(start)
+	workers.Wait()
+	close(results)
+
+	var latencies []time.Duration
+	for result := range results {
+		if result.err != nil {
+			t.Error(result.err)
+			continue
+		}
+		latencies = append(latencies, result.latency)
+	}
+	if t.Failed() {
+		return
+	}
+
+	wantPackets := clientCount * packetsPerClient
+	if len(latencies) != wantPackets {
+		t.Fatalf("completed packets = %d, want %d", len(latencies), wantPackets)
+	}
+	elapsed := time.Since(testStart)
+	if elapsed > maxTestDuration {
+		t.Fatalf("test duration = %s, want at most %s", elapsed, maxTestDuration)
+	}
+	sort.Slice(latencies, func(i, j int) bool { return latencies[i] < latencies[j] })
+	p95 := latencies[(len(latencies)*95+99)/100-1]
+	if p95 > maxP95Latency {
+		t.Fatalf("p95 latency = %s, want at most %s", p95, maxP95Latency)
+	}
+
+	current.mu.Lock()
+	sessionCount := len(current.sessions)
+	current.mu.Unlock()
+	if sessionCount != clientCount {
+		t.Fatalf("session count = %d, want %d", sessionCount, clientCount)
+	}
+	t.Logf("forwarded %d packets for %d clients in %s (p95 %s)", wantPackets, clientCount, elapsed, p95)
+}
+
 func TestUDPProxyRemovesIdleSessions(t *testing.T) {
 	upstream := startEchoServer(t)
 	current := startProxy(t, upstream.LocalAddr().String(), 30*time.Millisecond)
@@ -161,6 +240,50 @@ func TestSetRunStopsAllProxiesAfterCancellation(t *testing.T) {
 	}
 }
 
+func BenchmarkUDPProxyConcurrentClients(b *testing.B) {
+	for _, clientCount := range []int{20, 100} {
+		b.Run(strconv.Itoa(clientCount)+"Clients", func(b *testing.B) {
+			upstream := startEchoServer(b)
+			current := startProxy(b, upstream.LocalAddr().String(), time.Minute)
+			clients := make([]*net.UDPConn, clientCount)
+			for i := range clients {
+				clients[i] = dialProxy(b, current)
+				b.Cleanup(func() { clients[i].Close() })
+			}
+
+			payload := bytes.Repeat([]byte{0xab}, 512)
+			errs := make(chan error, clientCount)
+			var workers sync.WaitGroup
+			workers.Add(clientCount)
+			b.SetBytes(int64(len(payload)))
+			b.ReportAllocs()
+			b.ResetTimer()
+			for clientID, client := range clients {
+				go func() {
+					defer workers.Done()
+					for sequence := clientID; sequence < b.N; sequence += clientCount {
+						if err := roundTrip(client, payload, 5*time.Second); err != nil {
+							errs <- fmt.Errorf("client %d packet %d: %w", clientID, sequence, err)
+							return
+						}
+					}
+				}()
+			}
+			workers.Wait()
+			b.StopTimer()
+			close(errs)
+			for err := range errs {
+				b.Error(err)
+			}
+		})
+	}
+}
+
+type packetResult struct {
+	latency time.Duration
+	err     error
+}
+
 func echo(connection *net.UDPConn) {
 	buffer := make([]byte, 64*1024)
 	for {
@@ -174,7 +297,7 @@ func echo(connection *net.UDPConn) {
 	}
 }
 
-func startEchoServer(t *testing.T) *net.UDPConn {
+func startEchoServer(t testing.TB) *net.UDPConn {
 	t.Helper()
 	upstream, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
 	if err != nil {
@@ -185,7 +308,7 @@ func startEchoServer(t *testing.T) *net.UDPConn {
 	return upstream
 }
 
-func startProxy(t *testing.T, target string, idleTimeout time.Duration) *UDPProxy {
+func startProxy(t testing.TB, target string, idleTimeout time.Duration) *UDPProxy {
 	t.Helper()
 	current, err := newUDPProxy(config.Mapping{
 		Domain:      "featured.example.com.",
@@ -207,7 +330,7 @@ func startProxy(t *testing.T, target string, idleTimeout time.Duration) *UDPProx
 	return current
 }
 
-func dialProxy(t *testing.T, current *UDPProxy) *net.UDPConn {
+func dialProxy(t testing.TB, current *UDPProxy) *net.UDPConn {
 	t.Helper()
 	client, err := net.DialUDP("udp", nil, current.listener.LocalAddr().(*net.UDPAddr))
 	if err != nil {
@@ -218,20 +341,27 @@ func dialProxy(t *testing.T, current *UDPProxy) *net.UDPConn {
 
 func assertEcho(t *testing.T, client *net.UDPConn, message string) {
 	t.Helper()
-	if _, err := client.Write([]byte(message)); err != nil {
-		t.Fatalf("Write() error = %v", err)
+	if err := roundTrip(client, []byte(message), time.Second); err != nil {
+		t.Fatalf("roundTrip() error = %v", err)
 	}
-	if err := client.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
-		t.Fatalf("SetReadDeadline() error = %v", err)
+}
+
+func roundTrip(client *net.UDPConn, payload []byte, timeout time.Duration) error {
+	if _, err := client.Write(payload); err != nil {
+		return fmt.Errorf("write: %w", err)
 	}
-	buffer := make([]byte, 128)
+	if err := client.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		return fmt.Errorf("set read deadline: %w", err)
+	}
+	buffer := make([]byte, len(payload)+1)
 	size, err := client.Read(buffer)
 	if err != nil {
-		t.Fatalf("Read() error = %v", err)
+		return fmt.Errorf("read: %w", err)
 	}
-	if got := string(buffer[:size]); got != message {
-		t.Fatalf("response = %q, want %q", got, message)
+	if !bytes.Equal(buffer[:size], payload) {
+		return fmt.Errorf("response did not match %d-byte request", len(payload))
 	}
+	return nil
 }
 
 func waitFor(t *testing.T, timeout time.Duration, condition func() bool) {

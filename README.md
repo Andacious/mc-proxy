@@ -130,3 +130,24 @@ mappings:
 ```
 
 Both UDP and TCP DNS are supported. Bedrock game traffic is UDP.
+
+## Capacity testing
+
+The integration suite verifies 25 simultaneous clients forwarding 1,000 total
+UDP packets without loss, while enforcing a one-second maximum p95 loopback
+latency. Run it with race detection:
+
+```sh
+go test -race -run TestUDPProxyHandles25ConcurrentClients ./internal/proxy
+```
+
+Benchmarks for 20 and 100 concurrent clients report packet throughput, latency
+per operation, memory allocations, and bytes processed:
+
+```sh
+go test -run '^$' -bench BenchmarkUDPProxyConcurrentClients -benchmem ./internal/proxy
+```
+
+Loopback benchmarks validate proxy overhead rather than real-world Internet
+performance. Run them on the intended Docker host and test separately against
+the actual backend and network path before choosing a production capacity.
