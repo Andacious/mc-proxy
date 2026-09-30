@@ -4,11 +4,20 @@ services:
     container_name: mc-proxy
     restart: unless-stopped
     volumes:
-      - ./config.yaml:/etc/mc-proxy/config.yaml:ro
+      # The default configuration is written here on first start.
+      - mc-proxy-config:/etc/mc-proxy
     ports:
       - "53:5353/udp"
       - "53:5353/tcp"
+      # Configuration UI.
+      - "8080:8080/tcp"
       # Each LAN IP keeps Bedrock's default external port but maps to a
       # different internal listener from config.yaml.
       - "192.168.1.241:19132:19132/udp"
       - "192.168.1.242:19132:19133/udp"
+      - "192.168.1.243:19132:19134/udp"
+      - "192.168.1.244:19132:19135/udp"
+      - "192.168.1.245:19132:19136/udp"
+
+volumes:
+  mc-proxy-config:
