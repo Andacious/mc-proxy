@@ -29,8 +29,18 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Test
-        run: go test ./...
+      - name: Test with race detection and coverage
+        shell: bash
+        run: |
+          go test -race -covermode=atomic -coverprofile=coverage.out ./internal/...
+          go tool cover -func=coverage.out
+          coverage="$(go tool cover -func=coverage.out | awk '/^total:/ { gsub(/%/, "", $3); print $3 }')"
+          awk -v coverage="$coverage" 'BEGIN {
+            if (coverage + 0 < 80) {
+              printf "coverage %.1f%% is below the required 80%%\n", coverage
+              exit 1
+            }
+          }'
 
       - name: Vet
         run: go vet ./...

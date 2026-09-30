@@ -19,6 +19,7 @@ type Server struct {
 	ttl        uint32
 	forwarders []string
 	answers    map[string]net.IP
+	timeout    time.Duration
 	next       atomic.Uint64
 }
 
@@ -32,6 +33,7 @@ func New(cfg config.DNSConfig, mappings []config.Mapping) *Server {
 		ttl:        cfg.TTL,
 		forwarders: cfg.Forwarders,
 		answers:    answers,
+		timeout:    5 * time.Second,
 	}
 }
 
@@ -106,7 +108,7 @@ func (s *Server) forward(writer dns.ResponseWriter, request *dns.Msg) {
 	var lastErr error
 	for i := range s.forwarders {
 		forwarder := s.forwarders[(int(start)+i)%len(s.forwarders)]
-		client := &dns.Client{Net: network, Timeout: 5 * time.Second}
+		client := &dns.Client{Net: network, Timeout: s.timeout}
 		response, _, err := client.Exchange(request, forwarder)
 		if err != nil {
 			lastErr = err
