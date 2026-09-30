@@ -1,5 +1,7 @@
 # mc-proxy
 
+[![Docker](https://github.com/Andacious/mc-proxy/actions/workflows/docker.yml/badge.svg)](https://github.com/Andacious/mc-proxy/actions/workflows/docker.yml)
+
 `mc-proxy` lets Minecraft Bedrock consoles use custom servers through the
 featured-server list. It provides:
 
@@ -84,8 +86,17 @@ last port must match that mapping's `listen` port.
 
 ### 4. Start the service
 
+Build and start the service locally:
+
 ```sh
 docker compose up -d --build
+```
+
+Images for `linux/amd64` and `linux/arm64` are also published to GitHub
+Container Registry from `master` and version tags:
+
+```sh
+docker pull ghcr.io/andacious/mc-proxy:latest
 ```
 
 Configure the console's primary DNS server to the Docker host's regular LAN
