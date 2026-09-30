@@ -1,0 +1,20 @@
+dns:
+  # The container uses an unprivileged port; Docker publishes this as port 53.
+  listen: ":5353"
+  forwarders:
+    - "1.1.1.1:53"
+    - "8.8.8.8:53"
+  ttl: 60
+
+mappings:
+  - domain: "featured-one.example.net"
+    proxy_ip: "192.168.1.241"
+    listen: ":19132"
+    target: "my-home-server.example.org:20001"
+    idle_timeout: "2m"
+
+  - domain: "featured-two.example.net"
+    proxy_ip: "192.168.1.242"
+    listen: ":19133"
+    target: "my-home-server.example.org:20002"
+    idle_timeout: "2m"
