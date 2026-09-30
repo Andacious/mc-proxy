@@ -179,15 +179,21 @@ func sameOrigin(request *http.Request) bool {
 		return false
 	}
 
-	origin := request.Header.Get("Origin")
-	if origin == "" {
-		return true
+	for _, header := range []string{"Origin", "Referer"} {
+		value := request.Header.Get(header)
+		if value == "" {
+			continue
+		}
+		parsed, err := url.Parse(value)
+		if err != nil {
+			return false
+		}
+		return parsed.Host == request.Host
 	}
-	parsed, err := url.Parse(origin)
-	if err != nil {
-		return false
-	}
-	return parsed.Host == request.Host
+
+	// Neither header is present, so the request did not come from a browser
+	// page; command-line clients are allowed.
+	return true
 }
 
 func pageFromConfig(cfg config.Config) pageData {

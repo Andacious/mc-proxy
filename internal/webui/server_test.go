@@ -267,3 +267,25 @@ func TestSaveAllowsSameOriginSubmission(t *testing.T) {
 		t.Fatalf("status = %d, want %d: %s", recorder.Code, http.StatusOK, recorder.Body)
 	}
 }
+
+func TestSaveRejectsForeignReferer(t *testing.T) {
+	server, _ := newTestServer(t)
+	form := url.Values{
+		"dns_listen":     {":5353"},
+		"dns_forwarders": {"1.1.1.1:53"},
+		"domain":         {"one.example.net"},
+		"proxy_ip":       {"192.168.1.241"},
+		"listen":         {":19132"},
+		"target":         {"home.example.net:20001"},
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(form.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.Header.Set("Referer", "http://evil.example.com/page")
+	recorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusForbidden)
+	}
+}

@@ -9,7 +9,8 @@ services:
     ports:
       - "53:5353/udp"
       - "53:5353/tcp"
-      # Configuration UI.
+      # Configuration UI. It has no authentication; replace this with
+      # "127.0.0.1:8080:8080/tcp" to reach it only from the Docker host.
       - "8080:8080/tcp"
       # Each LAN IP keeps Bedrock's default external port but maps to a
       # different internal listener from config.yaml.
