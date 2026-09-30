@@ -2,6 +2,7 @@ package webui
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -165,7 +166,7 @@ func TestSaveRejectsInvalidInput(t *testing.T) {
 
 func TestRunServesAndShutsDown(t *testing.T) {
 	_, path := newTestServer(t)
-	server := New("127.0.0.1:18080", path)
+	server := New("127.0.0.1:0", path)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
@@ -175,7 +176,13 @@ func TestRunServesAndShutsDown(t *testing.T) {
 
 	var lastErr error
 	for i := 0; i < 50; i++ {
-		response, err := http.Get("http://127.0.0.1:18080/")
+		address := server.Addr()
+		if address == "" {
+			lastErr = errors.New("listener not ready")
+			time.Sleep(20 * time.Millisecond)
+			continue
+		}
+		response, err := http.Get("http://" + address + "/")
 		if err == nil {
 			response.Body.Close()
 			lastErr = nil

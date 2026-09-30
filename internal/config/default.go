@@ -1,8 +1,10 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -59,7 +61,7 @@ func LoadOrCreate(path string) (Config, bool, error) {
 	if err == nil {
 		return cfg, false, nil
 	}
-	if !os.IsNotExist(err) {
+	if !errors.Is(err, fs.ErrNotExist) {
 		return Config{}, false, err
 	}
 

@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"html/template"
 	"log/slog"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Andacious/mc-proxy/internal/config"
@@ -26,7 +28,17 @@ type Server struct {
 	listen     string
 	configPath string
 
-	mu sync.Mutex
+	mu   sync.Mutex
+	addr atomic.Pointer[string]
+}
+
+// Addr reports the address the UI is listening on, or an empty string before
+// Run has started listening.
+func (s *Server) Addr() string {
+	if address := s.addr.Load(); address != nil {
+		return *address
+	}
+	return ""
 }
 
 // New creates a configuration UI server that edits the file at configPath.
@@ -42,9 +54,16 @@ func (s *Server) Run(ctx context.Context) error {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
+	listener, err := net.Listen("tcp", s.listen)
+	if err != nil {
+		return fmt.Errorf("listen for configuration UI on %s: %w", s.listen, err)
+	}
+	address := listener.Addr().String()
+	s.addr.Store(&address)
+
 	errs := make(chan error, 1)
 	go func() {
-		errs <- server.ListenAndServe()
+		errs <- server.Serve(listener)
 	}()
 
 	select {
@@ -132,7 +151,7 @@ func (s *Server) handleSave(writer http.ResponseWriter, request *http.Request) {
 	s.mu.Unlock()
 	if err != nil {
 		page.Error = err.Error()
-		render(writer, http.StatusBadRequest, page)
+		render(writer, http.StatusInternalServerError, page)
 		return
 	}
 

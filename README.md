@@ -149,7 +149,7 @@ mappings:
   - domain: "geo.hivebedrock.network"
     proxy_ip: "192.168.1.241"
     listen: ":19132"
-    target: "my-home-server.example.org:20001"
+    target: "geo.hivebedrock.network:19132"
     idle_timeout: "2m"
 ```
 
