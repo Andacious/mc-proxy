@@ -11,8 +11,16 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// bedrockPort is the UDP port Bedrock consoles use for featured servers.
-const bedrockPort = "19132"
+const (
+	// bedrockPort is the UDP port Bedrock consoles use for featured servers.
+	bedrockPort = "19132"
+	// defaultProxyIPBase is the last octet of the first mapping's LAN address;
+	// later mappings use consecutive addresses in 192.168.1.0/24.
+	defaultProxyIPBase = 241
+	// defaultListenPortBase is the first mapping's internal UDP port; later
+	// mappings use consecutive ports.
+	defaultListenPortBase = 19132
+)
 
 // featuredServers lists the Bedrock featured-server hostnames that are mapped
 // to themselves by the default configuration.
@@ -39,8 +47,8 @@ func Default() Config {
 	for i, domain := range featuredServers {
 		cfg.Mappings = append(cfg.Mappings, Mapping{
 			Domain:      domain,
-			ProxyIPText: fmt.Sprintf("192.168.1.%d", 241+i),
-			Listen:      fmt.Sprintf(":%d", 19132+i),
+			ProxyIPText: fmt.Sprintf("192.168.1.%d", defaultProxyIPBase+i),
+			Listen:      fmt.Sprintf(":%d", defaultListenPortBase+i),
 			Target:      domain + ":" + bedrockPort,
 			IdleText:    defaultIdleTimeout.String(),
 		})

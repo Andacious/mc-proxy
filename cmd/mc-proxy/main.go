@@ -52,7 +52,9 @@ func run() error {
 	go func() {
 		errs <- proxies.Run(ctx)
 	}()
+	uiStatus := "disabled"
 	if *uiListen != "" {
+		uiStatus = *uiListen
 		ui := webui.New(*uiListen, *configPath)
 		go func() {
 			errs <- ui.Run(ctx)
@@ -62,7 +64,7 @@ func run() error {
 	slog.Info("mc-proxy started",
 		"dns_listen", cfg.DNS.Listen,
 		"mappings", len(cfg.Mappings),
-		"ui_listen", *uiListen,
+		"ui_listen", uiStatus,
 	)
 
 	select {

@@ -150,7 +150,7 @@ mappings:
     proxy_ip: "192.168.1.241"
     listen: ":19132"
     target: "geo.hivebedrock.network:19132"
-    idle_timeout: "2m"
+    idle_timeout: "2m0s"
 ```
 
 Both UDP and TCP DNS are supported. Bedrock game traffic is UDP.

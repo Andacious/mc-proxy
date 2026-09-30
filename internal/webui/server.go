@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -132,6 +133,11 @@ func (s *Server) handleIndex(writer http.ResponseWriter, request *http.Request) 
 }
 
 func (s *Server) handleSave(writer http.ResponseWriter, request *http.Request) {
+	if !sameOrigin(request) {
+		http.Error(writer, "cross-origin form submissions are rejected", http.StatusForbidden)
+		return
+	}
+
 	request.Body = http.MaxBytesReader(writer, request.Body, maxFormBytes)
 	if err := request.ParseForm(); err != nil {
 		http.Error(writer, "read form: "+err.Error(), http.StatusBadRequest)
@@ -159,6 +165,29 @@ func (s *Server) handleSave(writer http.ResponseWriter, request *http.Request) {
 	saved := pageFromConfig(cfg)
 	saved.Saved = true
 	render(writer, http.StatusOK, saved)
+}
+
+// sameOrigin rejects cross-site form submissions, which would otherwise let any
+// page a LAN user visits rewrite the configuration.
+func sameOrigin(request *http.Request) bool {
+	switch request.Header.Get("Sec-Fetch-Site") {
+	case "same-origin", "none":
+		return true
+	case "":
+		// Older clients do not send the header; fall back to Origin.
+	default:
+		return false
+	}
+
+	origin := request.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	return parsed.Host == request.Host
 }
 
 func pageFromConfig(cfg config.Config) pageData {
