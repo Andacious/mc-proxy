@@ -1,7 +1,6 @@
 # mc-proxy
 
 [![Docker](https://github.com/Andacious/mc-proxy/actions/workflows/docker.yml/badge.svg)](https://github.com/Andacious/mc-proxy/actions/workflows/docker.yml)
-[![Tests](https://github.com/Andacious/mc-proxy/actions/workflows/docker.yml/badge.svg?branch=master&event=push)](https://github.com/Andacious/mc-proxy/actions/workflows/docker.yml?query=branch%3Amaster)
 
 `mc-proxy` lets Minecraft Bedrock consoles use custom servers through the
 featured-server list. It provides:
